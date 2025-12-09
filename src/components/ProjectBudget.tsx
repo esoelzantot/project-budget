@@ -28,6 +28,7 @@ const ProjectBudget = () => {
     frontendHours: "",
     backendHours: "",
     points: 1,
+    notes: "", // NEW FIELD
   });
 
   // Section 5: Project Pages (Standard Mode)
@@ -39,6 +40,7 @@ const ProjectBudget = () => {
       frontendHours: "",
       backendHours: "",
       points: "",
+      notes: "", // NEW FIELD
     },
   ]);
 
@@ -123,6 +125,7 @@ const ProjectBudget = () => {
         frontendHours: "",
         backendHours: "",
         points: "",
+        notes: "", // NEW FIELD
       },
     ]);
   };
@@ -132,9 +135,14 @@ const ProjectBudget = () => {
     setProjectPages(projectPages.filter((page) => page.id !== id));
   };
 
-  // Update project page
+  // Update project page (Modified to handle non-numeric fields like notes and name)
   const updateProjectPage = (id: number, field: string, value: string) => {
-    if (parseFloat(value) < 0) return;
+    // Only apply positive check to numeric fields
+    if (
+      ["uiHours", "frontendHours", "backendHours", "points"].includes(field)
+    ) {
+      if (parseFloat(value) < 0) return;
+    }
     setProjectPages(
       projectPages.map((page) =>
         page.id === id ? { ...page, [field]: value } : page
@@ -195,11 +203,42 @@ const ProjectBudget = () => {
   const totals = calculateTotals();
 
   // --- Start of New Conditional Logic ---
+  // Profit & Final Cost are visible only if Total
   const showProfit = pricingType === "total";
   // External Services are visible only if Backend or Total
   const showExternalServices =
     pricingType === "backend" || pricingType === "total";
   // --- End of New Conditional Logic ---
+
+  // NEW CALCULATION FOR TOTAL HOURS/DAYS
+  const totalProjectHours = React.useMemo(() => {
+    return (
+      totals.totalUI +
+      totals.totalFrontend +
+      totals.totalBackend +
+      totals.totalAnalysis +
+      totals.totalTesting
+    );
+  }, [totals]);
+
+  const totalProjectDays = React.useMemo(() => {
+    return hoursPerDay && totalProjectHours > 0
+      ? Math.ceil(totalProjectHours / parseFloat(hoursPerDay))
+      : 0;
+  }, [totalProjectHours, hoursPerDay]);
+
+  // NEW: TOTAL PROJECT POINTS (Requested by user)
+  const totalProjectPoints = React.useMemo(() => {
+    if (pricingType === "total") {
+      // في وضع Total: يتم جمع النقاط المدخلة يدوياً لكل قسم
+      return totals.pointsUI + totals.pointsFrontend + totals.pointsBackend;
+    } else {
+      // في الوضع القياسي (Frontend, Backend, UI/UX):
+      // يتم احتساب النقاط مرة واحدة فقط، حيث أن (pointsUI) يمثل إجمالي نقاط الصفحات.
+      return totals.pointsUI;
+    }
+  }, [totals, pricingType]); // تمت إضافة pricingType كـ dependency
+  // END NEW CALCULATION
 
   // Calculate project cost
   const calculateProjectCost = () => {
@@ -360,6 +399,18 @@ const ProjectBudget = () => {
                </tr>
              </tbody>
            </table>
+           
+           ${
+             basePage.notes
+               ? `
+            <div style="background: #fff; border: 1px solid #e2e8f0; border-right: 4px solid #f97316; padding: 10px; border-radius: 4px; margin-top: 15px;">
+                <p style="margin: 0 0 5px 0; font-weight: 600; color: #f97316; font-size: 13px;">ملاحظات الصفحة الأساسية:</p>
+                <p style="margin: 0; color: #1e293b; white-space: pre-wrap; font-size: 14px;">${basePage.notes}</p>
+            </div>
+           `
+               : ""
+           }
+           
         </div>
 
         <div style="margin-bottom: 30px; page-break-inside: avoid;">
@@ -390,6 +441,18 @@ const ProjectBudget = () => {
                       page.points || 0
                     }</td>
                   </tr>
+                  ${
+                    page.notes
+                      ? `
+                  <tr>
+                      <td colspan="3" style="padding: 5px 10px; border: 1px solid #e2e8f0; background: #fafafa; text-align: right; font-size: 13px;">
+                          <span style="font-weight: 600; color: #475569;">ملاحظات: </span>
+                          <span style="white-space: pre-wrap;">${page.notes}</span>
+                      </td>
+                  </tr>
+                  `
+                      : ""
+                  }
                 `;
                 })
                 .join("")}
@@ -575,7 +638,16 @@ const ProjectBudget = () => {
               </tr>`
                   : ""
               }
-            </tbody>
+              
+              <tr style="background: #dbeafe; font-weight: 700;">
+                <td style="padding: 10px 15px; border: 1px solid #e2e8f0; font-weight: 700; color: #1e40af;">الإجمالي الكلي للمشروع</td>
+                <td style="text-align: center; border: 1px solid #e2e8f0;">${totalProjectHours.toFixed(
+                  2
+                )}</td>
+                <td style="text-align: center; border: 1px solid #e2e8f0;">${totalProjectPoints}</td>
+                <td style="text-align: center; border: 1px solid #e2e8f0;">${totalProjectDays}</td>
+              </tr>
+              </tbody>
           </table>
         </div>
 
@@ -1214,6 +1286,28 @@ const ProjectBudget = () => {
                   </div>
                 </div>
               </div>
+
+              {/* NEW: Base Page Notes */}
+              <div className="grid grid-cols-1 mb-4">
+                <label
+                  htmlFor="basePageNotes"
+                  className="block text-sm font-semibold text-gray-700 mb-2"
+                >
+                  ملاحظات (اختياري)
+                </label>
+                <textarea
+                  id="basePageNotes"
+                  value={basePage.notes}
+                  onChange={(e) =>
+                    setBasePage({ ...basePage, notes: e.target.value })
+                  }
+                  className="w-full px-4 py-2 border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:outline-none h-20"
+                  placeholder="أضف أي ملاحظات خاصة بالصفحة الأساسية هنا"
+                  title="ملاحظات حول الصفحة الأساسية"
+                />
+              </div>
+              {/* END NEW */}
+
               <div className="bg-blue-50 border-2 border-blue-300 rounded-lg p-4">
                 <p className="font-bold text-blue-900">
                   تكلفة الـ Point:{" "}
@@ -1378,6 +1472,27 @@ const ProjectBudget = () => {
                         </div>
                       </div>
                     </div>
+
+                    {/* NEW: Project Page Notes */}
+                    <div className="mt-4">
+                      <label
+                        htmlFor={`pageNotes-${page.id}`}
+                        className="block text-sm font-semibold text-gray-700 mb-2"
+                      >
+                        ملاحظات (اختياري)
+                      </label>
+                      <textarea
+                        id={`pageNotes-${page.id}`}
+                        value={page.notes}
+                        onChange={(e) =>
+                          updateProjectPage(page.id, "notes", e.target.value)
+                        }
+                        className="w-full px-4 py-2 border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:outline-none h-16"
+                        placeholder={`ملاحظات خاصة بصفحة ${index + 1}`}
+                        title={`ملاحظات حول صفحة ${index + 1}`}
+                      />
+                    </div>
+                    {/* END NEW */}
                   </div>
                 ))}
               </div>
@@ -1565,6 +1680,35 @@ const ProjectBudget = () => {
               </div>
             )}
           </div>
+
+          {/* UPDATED: Total Project Summary (Unconditional, showing all 3 metrics) */}
+          <div className="mt-6 bg-indigo-100 border-2 border-indigo-500 rounded-lg p-4 text-center grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="p-2">
+              <p className="text-lg text-indigo-700 font-semibold mb-1">
+                إجمالي عدد الساعات
+              </p>
+              <p className="text-3xl font-bold text-indigo-900">
+                {totalProjectHours.toFixed(2)}
+              </p>
+            </div>
+            <div className="p-2 border-y md:border-y-0 md:border-x border-indigo-200">
+              <p className="text-lg text-indigo-700 font-semibold mb-1">
+                إجمالي عدد النقاط
+              </p>
+              <p className="text-3xl font-bold text-indigo-900">
+                {totalProjectPoints}
+              </p>
+            </div>
+            <div className="p-2">
+              <p className="text-lg text-indigo-700 font-semibold mb-1">
+                إجمالي عدد الأيام
+              </p>
+              <p className="text-3xl font-bold text-indigo-900">
+                {totalProjectDays}
+              </p>
+            </div>
+          </div>
+          {/* END UPDATED */}
         </div>
 
         {/* Section 7.5: External Services - Conditional Display */}
