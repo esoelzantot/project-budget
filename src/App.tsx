@@ -1,4 +1,4 @@
-import ProjectBudget from "./components/ProjectBudget";
+import ProjectBudget from "./ProjectBudget";
 
 function App() {
   return <ProjectBudget />;
